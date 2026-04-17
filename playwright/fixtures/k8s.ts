@@ -35,6 +35,10 @@ export function yarn(args: string, options: { timeout?: number } = {}): string {
   return result.trim();
 }
 
+export async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Wait for a resource to have a specific condition
  */
@@ -82,7 +86,7 @@ export async function waitForCondition(
     }
 
     // Wait 5 seconds before checking again
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await sleep(5000);
   }
 
   throw new Error(
@@ -124,7 +128,7 @@ export async function waitForPod(
       // Pod might not exist yet
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await sleep(5000);
   }
 
   throw new Error(`Timeout waiting for pod ${podName} in namespace ${namespace}`);
@@ -133,17 +137,53 @@ export async function waitForPod(
 /**
  * Create a namespace (idempotent)
  */
-export function createNamespace(name: string): void {
-  kubectl(`create namespace ${name}`, { ignoreError: true });
-  console.log(`✓ Namespace ${name} ready`);
+export async function createNamespace(name: string, timeoutMs = 120000): Promise<void> {
+  const startTime = Date.now();
+  let created = false;
+
+  while (Date.now() - startTime < timeoutMs) {
+    const phase = kubectl(`get namespace ${name} -o jsonpath='{.status.phase}'`, {
+      ignoreError: true,
+    });
+
+    if (phase === 'Active') {
+      console.log(`✓ Namespace ${name} ready`);
+      return;
+    }
+
+    if (!phase && !created) {
+      kubectl(`create namespace ${name}`);
+      created = true;
+    }
+
+    await sleep(2000);
+  }
+
+  throw new Error(`Timeout waiting for namespace ${name} to become Active`);
 }
 
 /**
  * Delete a namespace
  */
-export function deleteNamespace(name: string): void {
-  kubectl(`delete namespace ${name} --ignore-not-found=true`, { timeout: 120000 });
-  console.log(`✓ Namespace ${name} deleted`);
+export async function deleteNamespace(name: string, timeoutMs = 180000): Promise<void> {
+  kubectl(`delete namespace ${name} --ignore-not-found=true --wait=false`);
+
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeoutMs) {
+    const phase = kubectl(`get namespace ${name} -o jsonpath='{.status.phase}'`, {
+      ignoreError: true,
+    });
+
+    if (!phase) {
+      console.log(`✓ Namespace ${name} deleted`);
+      return;
+    }
+
+    console.log(`  Namespace ${name} phase: ${phase}`);
+    await sleep(2000);
+  }
+
+  throw new Error(`Timeout waiting for namespace ${name} to be deleted`);
 }
 
 /**
@@ -179,4 +219,76 @@ export function secretExists(secretName: string, namespace: string): boolean {
   } catch {
     return false;
   }
+}
+
+function getJobDebugInfo(jobName: string, namespace: string): string {
+  const status = kubectl(`get job ${jobName} -n ${namespace} -o jsonpath='{.status}'`, {
+    ignoreError: true,
+  });
+  const podSummary = kubectl(
+    `get pods -l job-name=${jobName} -n ${namespace} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}'`,
+    { ignoreError: true },
+  );
+
+  const podNames = podSummary
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split('\t')[0]);
+  const latestPod = podNames[podNames.length - 1];
+
+  const logs = latestPod
+    ? kubectl(`logs ${latestPod} -n ${namespace} --all-containers=true --tail=80`, {
+        ignoreError: true,
+      })
+    : '';
+
+  return [
+    `Job status: ${status || '<unavailable>'}`,
+    `Job pods:\n${podSummary || '<none>'}`,
+    `Latest pod logs (${latestPod || 'n/a'}):\n${logs || '<unavailable>'}`,
+  ].join('\n\n');
+}
+
+/**
+ * Wait for a Kubernetes Job to complete successfully
+ */
+export async function waitForJob(
+  jobName: string,
+  namespace: string,
+  timeoutMs = 300000,
+): Promise<void> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      const conditions = kubectl(
+        `get job ${jobName} -n ${namespace} -o jsonpath='{.status.conditions}'`,
+        { ignoreError: true },
+      );
+
+      if (conditions) {
+        const conditionsArray = JSON.parse(conditions) as Array<{ type: string; status: string }>;
+
+        if (conditionsArray.find((c) => c.type === 'Failed' && c.status === 'True')) {
+          const debug = getJobDebugInfo(jobName, namespace);
+          throw new Error(`Job ${jobName} in namespace ${namespace} failed\n\n${debug}`);
+        }
+
+        if (conditionsArray.find((c) => c.type === 'Complete' && c.status === 'True')) {
+          console.log(`✓ Job ${jobName} completed successfully`);
+          return;
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith(`Job ${jobName}`)) throw error;
+      // JSON parse error or missing resource – continue waiting
+    }
+
+    console.log(`  Job ${jobName} still running...`);
+    await sleep(5000);
+  }
+
+  const debug = getJobDebugInfo(jobName, namespace);
+  throw new Error(`Timeout waiting for job ${jobName} in namespace ${namespace}\n\n${debug}`);
 }

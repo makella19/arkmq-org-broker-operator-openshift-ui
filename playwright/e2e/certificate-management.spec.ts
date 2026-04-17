@@ -2,8 +2,10 @@ import { test, expect } from '@playwright/test';
 import {
   kubectl,
   yarn,
+  sleep,
   waitForCondition,
   waitForPod,
+  waitForJob,
   createNamespace,
   deleteNamespace,
   applyYaml,
@@ -22,7 +24,7 @@ test.describe('Certificate Management E2E', () => {
   test.afterAll(async () => {
     // Cleanup test namespace
     console.log('\n🧹 Cleaning up test namespace...');
-    deleteNamespace(TEST_NAMESPACE);
+    await deleteNamespace(TEST_NAMESPACE);
 
     console.log('\n✅ E2E Tests Complete\n');
   });
@@ -56,7 +58,7 @@ test.describe('Certificate Management E2E', () => {
 
     // Step 2: Create test namespace
     console.log('\n📦 Step 2: Creating test namespace...');
-    createNamespace(TEST_NAMESPACE);
+    await createNamespace(TEST_NAMESPACE);
 
     // Step 3: Create BrokerService certificates
     console.log('\n📦 Step 3: Creating BrokerService certificate...');
@@ -90,16 +92,6 @@ spec:
       value: "-Dlog4j2.level=INFO"
 `;
     applyYaml(brokerServiceYaml);
-
-    // Check BrokerService status before waiting for pod
-    console.log('\n⏳ Checking BrokerService status...');
-    await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait for operator to process
-    const brokerStatus = kubectl(
-      `get brokerservice ${SERVICE_NAME} -n ${TEST_NAMESPACE} -o jsonpath='{.status.conditions[?(@.type=="Valid")].message}'`,
-    );
-    if (brokerStatus && brokerStatus.includes('failed')) {
-      throw new Error(`BrokerService validation failed: ${brokerStatus}`);
-    }
 
     // Wait for broker pod to be running (longer timeout for CI image pulls)
     console.log('\n⏳ Waiting for broker pod to be ready...');
@@ -160,16 +152,144 @@ spec:
 
     // Step 7: Verify broker is functional
     console.log('\n📦 Step 7: Verifying broker is active...');
-    const brokerLogs = kubectl(`logs ${SERVICE_NAME}-ss-0 -n ${TEST_NAMESPACE}`, {
-      timeout: 30000,
-    });
-
-    // Check for broker started message
-    expect(brokerLogs).toContain('AMQ221007');
+    const brokerStartDeadline = Date.now() + 120000;
+    let brokerStarted = false;
+    while (Date.now() < brokerStartDeadline) {
+      const brokerLogs = kubectl(`logs ${SERVICE_NAME}-ss-0 -n ${TEST_NAMESPACE}`, {
+        timeout: 30000,
+      });
+      if (brokerLogs.includes('AMQ221007')) {
+        brokerStarted = true;
+        break;
+      }
+      await sleep(5000);
+    }
+    expect(brokerStarted).toBe(true);
     console.log('  ✓ Broker is active (AMQ221007 found in logs)');
 
-    // Step 8: Verify all expected secrets exist
-    console.log('\n📦 Step 8: Verifying all certificates and secrets...');
+    // Wait for BrokerApp to be provisioned on the broker (JAAS config applied)
+    console.log('\n⏳ Waiting for BrokerApp to be provisioned on the broker...');
+    await waitForCondition('brokerapp', APP_NAME, TEST_NAMESPACE, 'Deployed', 'True', 300000);
+
+    // Step 8: Create client PEM configuration secret
+    console.log('\n📦 Step 8: Creating client PEM configuration secret...');
+    const pemCfgYaml = `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cert-pemcfg
+  namespace: ${TEST_NAMESPACE}
+type: Opaque
+stringData:
+  tls.pemcfg: |
+    source.key=/app/tls/client/tls.key
+    source.cert=/app/tls/client/tls.crt
+  java.security: security.provider.6=de.dentrassi.crypto.pem.PemKeyStoreProvider
+`;
+    applyYaml(pemCfgYaml);
+
+    // Step 9: Run producer job
+    console.log('\n📦 Step 9: Running producer job...');
+    const producerYaml = `
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: producer
+  namespace: ${TEST_NAMESPACE}
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      activeDeadlineSeconds: 180
+      containers:
+      - name: producer
+        image: quay.io/arkmq-org/activemq-artemis-broker-kubernetes:artemis.2.40.0
+        command:
+        - "/bin/sh"
+        - "-c"
+        - exec java -classpath /opt/amq/lib/*:/opt/amq/lib/extra/* org.apache.activemq.artemis.cli.Artemis producer --protocol=AMQP --url 'amqps://${SERVICE_NAME}:61616?transport.trustStoreType=PEMCA&transport.trustStoreLocation=/app/tls/ca/ca.pem&transport.keyStoreType=PEMCFG&transport.keyStoreLocation=/app/tls/pem/tls.pemcfg' --message-count 1 --destination queue://APP.JOBS
+        env:
+        - name: JDK_JAVA_OPTIONS
+          value: "-Djava.security.properties=/app/tls/pem/java.security"
+        volumeMounts:
+        - name: trust
+          mountPath: /app/tls/ca
+        - name: cert
+          mountPath: /app/tls/client
+        - name: pem
+          mountPath: /app/tls/pem
+      volumes:
+      - name: trust
+        secret:
+          secretName: activemq-artemis-manager-ca
+      - name: cert
+        secret:
+          secretName: ${APP_NAME}-app-cert
+      - name: pem
+        secret:
+          secretName: cert-pemcfg
+      restartPolicy: Never
+`;
+    applyYaml(producerYaml);
+
+    console.log('\n⏳ Waiting for producer job to complete...');
+    await waitForJob('producer', TEST_NAMESPACE, 300000);
+
+    // Step 10: Run consumer job
+    console.log('\n📦 Step 10: Running consumer job...');
+    const consumerYaml = `
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: consumer
+  namespace: ${TEST_NAMESPACE}
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      activeDeadlineSeconds: 120
+      containers:
+      - name: consumer
+        image: quay.io/arkmq-org/activemq-artemis-broker-kubernetes:artemis.2.40.0
+        command:
+        - "/bin/sh"
+        - "-c"
+        - exec java -classpath /opt/amq/lib/*:/opt/amq/lib/extra/* org.apache.activemq.artemis.cli.Artemis consumer --protocol=AMQP --url 'amqps://${SERVICE_NAME}:61616?transport.trustStoreType=PEMCA&transport.trustStoreLocation=/app/tls/ca/ca.pem&transport.keyStoreType=PEMCFG&transport.keyStoreLocation=/app/tls/pem/tls.pemcfg' --message-count 1 --destination queue://APP.JOBS --receive-timeout 30000
+        env:
+        - name: JDK_JAVA_OPTIONS
+          value: "-Djava.security.properties=/app/tls/pem/java.security"
+        volumeMounts:
+        - name: trust
+          mountPath: /app/tls/ca
+        - name: cert
+          mountPath: /app/tls/client
+        - name: pem
+          mountPath: /app/tls/pem
+      volumes:
+      - name: trust
+        secret:
+          secretName: activemq-artemis-manager-ca
+      - name: cert
+        secret:
+          secretName: ${APP_NAME}-app-cert
+      - name: pem
+        secret:
+          secretName: cert-pemcfg
+      restartPolicy: Never
+`;
+    applyYaml(consumerYaml);
+
+    // Step 11: Verify message round-trip
+    console.log('\n📦 Step 11: Waiting for consumer job to complete...');
+    await waitForJob('consumer', TEST_NAMESPACE, 300000);
+    const consumerLogs = kubectl(`logs -l job-name=consumer -n ${TEST_NAMESPACE}`, {
+      ignoreError: true,
+    });
+    expect(consumerLogs).toContain('Consumed: 1 messages');
+    console.log('  ✓ Message round-trip complete (producer sent, consumer received)');
+
+    // Step 12: Verify all expected secrets exist
+    console.log('\n📦 Step 12: Verifying all certificates and secrets...');
     const secrets = kubectl(`get secrets -n ${TEST_NAMESPACE} -o json`);
     const secretsJson = JSON.parse(secrets) as {
       items: Array<{ metadata: { name: string } }>;
@@ -201,6 +321,8 @@ spec:
     console.log('  ✓ BrokerService deployed (Deployed=True)');
     console.log('  ✓ BrokerApp deployed (Valid=True)');
     console.log('  ✓ Broker pod is active (AMQ221007)');
+    console.log('  ✓ Producer sent 1 message to APP.JOBS over mTLS');
+    console.log('  ✓ Consumer received 1 message from APP.JOBS over mTLS');
     console.log('  ✓ All required secrets exist');
     console.log('  ✓ Binding secret contains connection details');
   });
@@ -213,7 +335,7 @@ spec:
     expect(cleanupOutput).toContain('Cleanup complete');
 
     // Wait a bit for resources to be deleted
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    await sleep(10000);
 
     // Verify ClusterIssuers are deleted
     const rootIssuerExists = kubectl('get clusterissuer root-issuer', { ignoreError: true });
