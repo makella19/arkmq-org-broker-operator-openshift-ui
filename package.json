@@ -71,7 +71,8 @@
     "displayName": "ArkMQ Broker Operator OpenShift UI",
     "description": "OpenShift Console plugin UI for ArkMQ Broker Operator.",
     "exposedModules": {
-      "ExamplePage": "./components/ExamplePage"
+      "ExamplePage": "./components/ExamplePage",
+      "CreateBrokerAppPage": "./components/brokerapps/CreateBrokerAppPage"
     },
     "dependencies": {
       "@console/pluginAPI": "*"

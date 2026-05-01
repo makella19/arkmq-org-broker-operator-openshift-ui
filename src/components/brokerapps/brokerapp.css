@@ -1,0 +1,90 @@
+.plugin__arkmq-org-broker-operator-openshift-ui__view-toggle {
+  display: flex;
+  gap: var(--pf-t--global--spacer--md);
+  margin-bottom: var(--pf-t--global--spacer--lg);
+  align-items: center;
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__error-alert {
+  margin-bottom: var(--pf-t--global--spacer--md);
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__section-desc {
+  margin-bottom: var(--pf-t--global--spacer--md);
+  color: var(--pf-t--global--text--color--subtle);
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__labels-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
+  margin-top: var(--pf-t--global--spacer--sm);
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__label-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__label-eq {
+  color: var(--pf-t--global--text--color--subtle);
+  flex-shrink: 0;
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__address-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
+  margin-top: var(--pf-t--global--spacer--sm);
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__address-input-row {
+  display: flex;
+  gap: var(--pf-t--global--spacer--sm);
+  align-items: center;
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__address-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--xs);
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__address-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--pf-t--global--spacer--xs) var(--pf-t--global--spacer--sm);
+  background-color: var(--pf-t--global--background--color--secondary--default);
+  border: 1px solid var(--pf-t--global--border--color--default);
+  border-radius: var(--pf-t--global--border--radius--small);
+  font-family: monospace;
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__add-label-btn {
+  margin-top: var(--pf-t--global--spacer--sm);
+  align-self: flex-start;
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__yaml-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--md);
+}
+
+.plugin__arkmq-org-broker-operator-openshift-ui__yaml-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+}
+
+/* Hide ResourceYAMLEditor's own Save/Reload/Cancel footer — we provide our own Create/Cancel */
+.plugin__arkmq-org-broker-operator-openshift-ui__yaml-editor-wrapper #save-changes,
+.plugin__arkmq-org-broker-operator-openshift-ui__yaml-editor-wrapper #reload-object,
+.plugin__arkmq-org-broker-operator-openshift-ui__yaml-editor-wrapper #cancel {
+  display: none;
+}
