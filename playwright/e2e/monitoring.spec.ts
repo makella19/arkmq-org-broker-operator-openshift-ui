@@ -189,8 +189,6 @@ spec:
   selector:
     matchLabels:
       forWorkQueue: "true"
-  acceptor:
-    port: 61616
   capabilities:
   - consumerOf:
     - address: "APP.JOBS"

@@ -142,8 +142,6 @@ spec:
   selector:
     matchLabels:
       forWorkQueue: "true"
-  acceptor:
-    port: 61616
   capabilities:
   - producerOf:
     - address: "APP.JOBS"
