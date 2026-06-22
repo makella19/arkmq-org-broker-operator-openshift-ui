@@ -1,7 +1,6 @@
-# OpenShift Console Plugin Template
+# ArkMQ Broker Operator OpenShift UI
 
-This project is a minimal template for writing a new OpenShift Console dynamic
-plugin.
+OpenShift Console plugin for the ArkMQ Broker Operator. It extends the admin perspective with workflows for provisioning messaging infrastructure and connecting applications to brokers.
 
 [Dynamic plugins](https://github.com/openshift/console/tree/master/frontend/packages/console-dynamic-plugin-sdk)
 allow you to extend the
@@ -11,23 +10,24 @@ at runtime, adding custom pages and other extensions. They are based on
 Plugins are registered with console using the `ConsolePlugin` custom resource
 and enabled in the console operator config by a cluster administrator.
 
-Using the latest `v1` API version of `ConsolePlugin` CRD, requires OpenShift 4.12
-and higher. For using old `v1alpha1` API version us OpenShift version 4.10 or 4.11.
+Using the latest `v1` API version of `ConsolePlugin` CRD requires OpenShift 4.12
+and higher. For the older `v1alpha1` API version, use OpenShift 4.10 or 4.11.
 
-For an example of a plugin that works with OpenShift 4.11, see the `release-4.11` branch.
-For a plugin that works with OpenShift 4.10, see the `release-4.10` branch.
+For examples targeting older OpenShift versions, see the upstream
+[OpenShift Console Plugin Template](https://github.com/openshift/console-plugin-template)
+`release-4.11` and `release-4.10` branches.
 
 [Node.js](https://nodejs.org/en/) and [yarn](https://yarnpkg.com) are required
-to build and run the example. To run OpenShift console in a container, either
+to build and run the plugin. To run OpenShift console in a container, either
 [Docker](https://www.docker.com) or [podman 3.2.0+](https://podman.io) and
 [oc](https://console.redhat.com/openshift/downloads) are required.
 
 ## Getting started
 
-The template adds a single example page in the Home navigation section. The
-extension is declared in the [console-extensions.json](console-extensions.json)
-file and the React component is declared in
-[src/components/ExamplePage.tsx](src/components/ExamplePage.tsx).
+The plugin adds BrokerService and BrokerApp pages in the **Workloads** navigation
+section. Extensions are declared in
+[console-extensions.json](console-extensions.json), and React components live under
+[src/brokerapps](src/brokerapps) and [src/brokerservices](src/brokerservices).
 
 You can run the plugin using a local development environment or build an image
 to deploy it to a cluster.
@@ -45,11 +45,13 @@ In another terminal window, run:
 
 1. `oc login` (requires [oc](https://console.redhat.com/openshift/downloads) and an [OpenShift cluster](https://console.redhat.com/openshift/create))
 2. `cd ./bridge-auth-http/ && ./setup.sh && cd ..`
-2. `yarn run start-console` (requires [Docker](https://www.docker.com) or [podman 3.2.0+](https://podman.io))
+3. `yarn run start-console` (requires [Docker](https://www.docker.com) or [podman 3.2.0+](https://podman.io))
 
 This will run the OpenShift console in a container connected to the cluster
 you've logged into. The plugin HTTP server runs on port 9001 with CORS enabled.
-Navigate to <http://localhost:9000/example> to see the running plugin.
+Navigate to <http://localhost:9000> to see the running plugin.
+
+To view our plugin on OpenShift, navigate to the Workloads section. The plugin will be listed as BrokerServices and BrokerApps.
 
 #### Running start-console with Apple silicon and podman
 
@@ -77,7 +79,7 @@ cached containers will help you start developing in seconds.
 1. Create a `dev.env` file inside the `.devcontainer` folder with the correct values for your cluster:
 
 ```bash
-OC_PLUGIN_NAME=console-plugin-template
+OC_PLUGIN_NAME=arkmq-org-broker-operator-openshift-ui
 OC_URL=https://api.example.com:6443
 OC_USER=kubeadmin
 OC_PASS=<password>
@@ -85,7 +87,7 @@ OC_PASS=<password>
 
 2. `(Ctrl+Shift+P) => Remote Containers: Open Folder in Container...`
 3. `yarn run start`
-4. Navigate to <http://localhost:9000/example>
+4. Navigate to <http://localhost:9000>
 
 ## Docker image
 
@@ -126,7 +128,9 @@ Additional parameters can be specified if desired. Consult the chart [values](ch
 
 ### Installing the Helm Chart
 
-Install the chart using the name of the plugin as the Helm release name into a new namespace or an existing namespace as specified by the `plugin_console-plugin-template` parameter and providing the location of the image within the `plugin.image` parameter by using the following command:
+Install the chart using the name of the plugin as the Helm release name into a
+new namespace or an existing namespace, providing the location of the image
+within the `plugin.image` parameter:
 
 ```shell
 helm upgrade -i  my-plugin charts/openshift-console-plugin -n my-namespace --create-namespace --set plugin.image=my-plugin-image-location
@@ -140,20 +144,20 @@ NOTE: When defining i18n namespace, adhere `plugin__<name-of-the-plugin>` format
 
 The plugin template demonstrates how you can translate messages in with [react-i18next](https://react.i18next.com/). The i18n namespace must match
 the name of the `ConsolePlugin` resource with the `plugin__` prefix to avoid
-naming conflicts. For example, the plugin template uses the
-`plugin__console-plugin-template` namespace. You can use the `useTranslation` hook
+naming conflicts. For example, this plugin uses the
+`plugin__arkmq-org-broker-operator-openshift-ui` namespace. You can use the `useTranslation` hook
 with this namespace as follows:
 
 ```tsx
-conster Header: React.FC = () => {
-  const { t } = useTranslation('plugin__console-plugin-template');
+const Header: React.FC = () => {
+  const { t } = useTranslation('plugin__arkmq-org-broker-operator-openshift-ui');
   return <h1>{t('Hello, World!')}</h1>;
 };
 ```
 
 For labels in `console-extensions.json`, you can use the format
-`%plugin__console-plugin-template~My Label%`. Console will replace the value with
-the message for the current language from the `plugin__console-plugin-template`
+`%plugin__arkmq-org-broker-operator-openshift-ui~My Label%`. Console will replace the value with
+the message for the current language from the `plugin__arkmq-org-broker-operator-openshift-ui`
 namespace. For example:
 
 ```json
@@ -162,13 +166,13 @@ namespace. For example:
     "properties": {
       "id": "admin-demo-section",
       "perspective": "admin",
-      "name": "%plugin__console-plugin-template~Plugin Template%"
+      "name": "%plugin__arkmq-org-broker-operator-openshift-ui~Plugin Template%"
     }
   }
 ```
 
-Running `yarn i18n` updates the JSON files in the `locales` folder of the
-plugin template when adding or changing messages.
+Running `yarn i18n` updates the JSON files in the `locales` folder when adding
+or changing messages.
 
 ## Certificate Management for BrokerService and BrokerApp
 
@@ -416,6 +420,12 @@ kubectl -n openshift-user-workload-monitoring get pods
 ```
 
 ## Testing
+
+### Unit tests
+
+```bash
+yarn test
+```
 
 ### E2E Tests with Playwright
 

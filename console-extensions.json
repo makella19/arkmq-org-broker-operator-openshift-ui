@@ -3,14 +3,6 @@
     "type": "console.page/route",
     "properties": {
       "exact": true,
-      "path": "/example",
-      "component": { "$codeRef": "ExamplePage" }
-    }
-  },
-  {
-    "type": "console.page/route",
-    "properties": {
-      "exact": true,
       "path": "/k8s/ns/:ns/brokerapps/~new",
       "component": { "$codeRef": "CreateBrokerAppPage" }
     }
@@ -31,10 +23,10 @@
     "properties": {
       "exact": true,
       "path": "/k8s/ns/:ns/brokerservices/~new",
-      "component": { "$codeRef": "BrokerServiceCreatePage" }
+      "component": { "$codeRef": "CreateBrokerServicePage" }
     }
   },
-   {
+  {
     "type": "console.resource/create",
     "properties": {
       "model": {
@@ -42,17 +34,7 @@
         "version": "v1beta2",
         "kind": "BrokerService"
       },
-      "component": { "$codeRef": "BrokerServiceCreatePage" }
-    }
-  },
-  {
-    "type": "console.navigation/href",
-    "properties": {
-      "id": "example",
-      "name": "%plugin__arkmq-org-broker-operator-openshift-ui~Plugin Example%",
-      "href": "/example",
-      "perspective": "admin",
-      "section": "home"
+      "component": { "$codeRef": "CreateBrokerServicePage" }
     }
   },
   {

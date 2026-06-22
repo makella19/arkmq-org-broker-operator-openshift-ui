@@ -27,7 +27,7 @@ import {
   BrokerServiceFormDispatchContext,
 } from '../../reducers/brokerservice/reducer';
 
-const BrokerServiceCreatePage: FC = () => {
+const CreateBrokerServicePage: FC = () => {
   const { t } = useTranslation('plugin__arkmq-org-broker-operator-openshift-ui');
   const { ns: namespace = 'default' } = useParams<{ ns: string }>();
   const navigate = useNavigate();
@@ -128,4 +128,4 @@ const BrokerServiceCreatePage: FC = () => {
   );
 };
 
-export default BrokerServiceCreatePage;
+export default CreateBrokerServicePage;

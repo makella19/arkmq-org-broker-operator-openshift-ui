@@ -16,7 +16,7 @@ This is a **template repository** for creating OpenShift Console dynamic plugins
 - PatternFly 6 (UI component library)
 - Webpack 5 with Module Federation
 - react-i18next for internationalization
-- Cypress for e2e testing
+- Playwright for e2e testing
 - Helm for deployment
 
 **Compatibility:** Requires OpenShift 4.12+ (uses ConsolePlugin CRD v1 API)
@@ -141,16 +141,19 @@ return <h1>{t('Hello, World!')}</h1>;
 
 ```
 src/
-  components/          # React components
-    ExamplePage.tsx   # Example page component
-    *.css            # Component styles (scoped with plugin prefix)
-console-extensions.json # Plugin extension declarations
-package.json           # Plugin metadata in consolePlugin section
-tsconfig.json          # TypeScript config (strict: true)
-webpack.config.ts      # Module federation + build config
-locales/               # i18n translation files
-charts/                # Helm chart for deployment
-integration-tests/     # Cypress e2e tests
+  brokerapps/            # BrokerApp features (e.g. createBrokerApp/)
+  brokerservices/        # BrokerService features (e.g. createBrokerService/)
+  shared-components/     # Cross-resource UI shared by multiple features
+  reducers/              # Form state reducers by resource type
+  k8s/                   # CRD models and types
+  validation/            # Shared validation rules
+console-extensions.json  # Plugin extension declarations
+package.json             # Plugin metadata in consolePlugin section
+tsconfig.json            # TypeScript config (strict: true)
+webpack.config.ts        # Module federation + build config
+locales/                 # i18n translation files
+charts/                  # Helm chart for deployment
+playwright/              # Playwright e2e tests
 ```
 
 ### **CRITICAL: No Utils Folders**
@@ -174,7 +177,7 @@ These become dumping grounds for poorly organized code. Every function should li
 1. `yarn install` - install dependencies
 2. `yarn start` - starts webpack dev server on port 9001 with CORS
 3. `yarn start-console` - runs OpenShift console in container (requires cluster login)
-4. Navigate to http://localhost:9000/example
+4. Navigate to http://localhost:9000 and open **Workloads** → **BrokerServices** and **BrokerApps**
 
 ### Code Quality
 - `yarn lint` - runs eslint, prettier, and stylelint (with --fix)
@@ -182,9 +185,10 @@ These become dumping grounds for poorly organized code. Every function should li
 - Follow existing code patterns in the repo
 
 ### Testing
-- `yarn test-cypress` - opens Cypress UI
-- `yarn test-cypress-headless` - runs Cypress in CI mode
-- Add e2e tests for new pages/features
+- `yarn test` - runs Jest unit tests
+- `yarn pw:ui` - opens Playwright UI (requires console + cluster)
+- `yarn pw:test` - runs Playwright e2e tests headless
+- Add e2e tests under `playwright/e2e/` for new pages/features
 
 ## TypeScript Configuration
 
@@ -370,7 +374,7 @@ if (process.env.CI === 'true') {
 
 ### General Testing Guidelines
 
-- **E2E tests (Playwright/Cypress):** For user flows and page rendering on real clusters
+- **E2E tests (Playwright):** For user flows and page rendering on real clusters
 - **Unit tests (Jest/Vitest):** For component logic, hooks, reducers, and utility functions
 - **Test data attributes:** Use `data-test` attributes for selectors
 - Run tests locally before opening PRs
@@ -390,5 +394,5 @@ if (process.env.CI === 'true') {
 - **Add a page?** Update console-extensions.json + exposedModules + create component
 - **Style something?** Use PatternFly components and CSS variables, prefix custom classes
 - **Add translations?** Use `t()` function, run `yarn i18n` after
-- **Test changes?** Run locally with `yarn start` + `yarn start-console`, add Cypress tests
+- **Test changes?** Run `yarn test` for unit tests; run locally with `yarn start` + `yarn start-console`, add Playwright tests under `playwright/e2e/`
 - **Deploy?** Build image, push to registry, install via Helm chart

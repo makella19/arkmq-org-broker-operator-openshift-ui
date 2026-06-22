@@ -166,7 +166,7 @@ describe('broker service hooks', () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
     expect(() => renderHook(() => useBrokerServiceFormState())).toThrow(
-      'useBrokerServiceFormState must be used inside BrokerServiceCreatePage',
+      'useBrokerServiceFormState must be used inside BrokerServiceFormStateContext.Provider',
     );
 
     jest.restoreAllMocks();
@@ -176,7 +176,7 @@ describe('broker service hooks', () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
     expect(() => renderHook(() => useBrokerServiceFormDispatch())).toThrow(
-      'useBrokerServiceFormDispatch must be used inside BrokerServiceCreatePage',
+      'useBrokerServiceFormDispatch must be used inside BrokerServiceFormDispatchContext.Provider',
     );
 
     jest.restoreAllMocks();
