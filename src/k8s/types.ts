@@ -7,6 +7,8 @@ export enum EditorType {
 
 export interface MatchAddress {
   address: string;
+  /** Cross-app reference app name; empty for local addresses. */
+  appName?: string;
 }
 
 export interface BrokerAppCapability {
@@ -19,10 +21,16 @@ export interface BrokerAppSpec {
   capabilities?: BrokerAppCapability[];
 }
 
+export interface BrokerAppServiceBinding {
+  name: string;
+  namespace: string;
+  assignedPort: number;
+}
+
 export interface BrokerAppStatus {
   conditions?: K8sResourceCondition[];
   /** Set by the operator once the app is bound to a BrokerService. */
-  service?: { name: string; namespace: string };
+  service?: BrokerAppServiceBinding;
 }
 
 export type BrokerAppCR = K8sResourceCommon & {

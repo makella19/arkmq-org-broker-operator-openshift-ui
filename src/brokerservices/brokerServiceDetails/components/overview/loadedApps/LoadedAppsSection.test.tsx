@@ -18,7 +18,7 @@ const makeApp = (name: string, service?: { name: string; namespace: string }): B
   metadata: { name, namespace: 'default' },
   spec: {},
   status: {
-    service,
+    service: service ? { ...service, assignedPort: 0 } : undefined,
     conditions: [{ type: 'Deployed', status: K8sResourceConditionStatus.True }],
   },
 });

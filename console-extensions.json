@@ -71,6 +71,17 @@
     }
   },
   {
+    "type": "console.page/resource/details",
+    "properties": {
+      "model": {
+        "group": "broker.arkmq.org",
+        "version": "v1beta2",
+        "kind": "BrokerApp"
+      },
+      "component": { "$codeRef": "BrokerAppDetailsPage" }
+    }
+  },
+  {
     "type": "console.navigation/resource-ns",
     "properties": {
       "id": "brokerApps",

@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 export interface ResourceLabelsAndAnnotationsProps {
   /** CR whose labels and annotations are shown and edited. */
   resource: K8sResourceCommon;
+  /** Optional read-only key=value map rendered above Labels (e.g. spec.selector.matchLabels). */
+  selectorLabels?: Record<string, string>;
 }
 
 interface MetadataMapFieldProps {
@@ -14,8 +16,8 @@ interface MetadataMapFieldProps {
   label: string;
   entries?: Record<string, string>;
   emptyText: string;
-  editLabel: string;
-  onEdit: () => void;
+  editLabel?: string;
+  onEdit?: () => void;
   dataTest: string;
 }
 
@@ -45,9 +47,11 @@ const MetadataMapField: FC<MetadataMapFieldProps> = ({
         categoryName={label}
         numLabels={20}
         addLabelControl={
-          <Button variant="link" isInline onClick={onEdit} data-test={`${fieldId}-edit`}>
-            {editLabel}
-          </Button>
+          onEdit ? (
+            <Button variant="link" isInline onClick={onEdit} data-test={`${fieldId}-edit`}>
+              {editLabel}
+            </Button>
+          ) : undefined
         }
       >
         {pairs.length === 0 ? (
@@ -70,6 +74,7 @@ const MetadataMapField: FC<MetadataMapFieldProps> = ({
  */
 export const ResourceLabelsAndAnnotations: FC<ResourceLabelsAndAnnotationsProps> = ({
   resource,
+  selectorLabels,
 }) => {
   const { t } = useTranslation('plugin__arkmq-org-broker-operator-openshift-ui');
   const launchLabelsModal = useLabelsModal(resource);
@@ -77,6 +82,17 @@ export const ResourceLabelsAndAnnotations: FC<ResourceLabelsAndAnnotationsProps>
 
   return (
     <Stack hasGutter data-test="resource-labels-and-annotations">
+      {selectorLabels !== undefined && (
+        <StackItem>
+          <MetadataMapField
+            fieldId="resource-selector-labels"
+            label={t('Service Selector')}
+            entries={selectorLabels}
+            emptyText={t('No selector configured')}
+            dataTest="resource-selector-labels-field"
+          />
+        </StackItem>
+      )}
       <StackItem>
         <MetadataMapField
           fieldId="resource-labels"

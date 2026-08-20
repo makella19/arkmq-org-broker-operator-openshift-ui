@@ -343,7 +343,6 @@ spec:
 
     // ── Test: delete an app → it disappears from the list ─────────────────
     // Creates its own throwaway app so neither lifecycle app is touched.
-
     test('deleting an app removes it from the list', async ({ page }) => {
       const appToDelete = 'list-app-to-delete';
 
@@ -382,6 +381,115 @@ spec:
         timeout: 30000,
       });
       console.log(`✓ ${appToDelete} row removed from list after deletion`);
+    });
+  });
+
+  // ── Details page UI tests ───────────────────────────────────────────────────
+  // Reuses apps created by lifecycle tests above — no new cluster resources needed.
+
+  test.describe('BrokerApp details page', () => {
+    const PROVISIONED_APP = 'e2e-app-matching';
+    const DETAILS_URL = `/k8s/ns/${TEST_NAMESPACE}/broker.arkmq.org~v1beta2~BrokerApp/${PROVISIONED_APP}`;
+
+    // ── Test: provisioned app shows broker host and port ──────────────────
+
+    test('provisioned app shows broker host and port in connection information', async ({
+      page,
+    }) => {
+      const expectedHost = `${SERVICE_NAME}.${TEST_NAMESPACE}.svc.cluster.local`;
+      const expectedPort = kubectl(
+        `get brokerapp ${PROVISIONED_APP} -n ${TEST_NAMESPACE} -o jsonpath='{.status.service.assignedPort}'`,
+      );
+
+      await login(page, 'kubeadmin', process.env.KUBEADMIN_PASSWORD || 'kubeadmin');
+      await page.goto(DETAILS_URL, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-test="broker-app-overview-tab"]', { timeout: 30000 });
+
+      // ClipboardCopy renders the value inside an <input> — assert via its value.
+      await expect(page.locator('[data-test="broker-app-connection-host"] input')).toHaveValue(
+        expectedHost,
+        { timeout: 15000 },
+      );
+      await expect(page.locator('[data-test="broker-app-connection-port"] input')).toHaveValue(
+        expectedPort,
+        { timeout: 15000 },
+      );
+      console.log(`✓ Connection info shows host=${expectedHost} port=${expectedPort}`);
+    });
+
+    // ── Test: copy button copies host value to clipboard ──────────────────
+
+    test('copy button copies broker host to clipboard', async ({ page, context }) => {
+      const expectedHost = `${SERVICE_NAME}.${TEST_NAMESPACE}.svc.cluster.local`;
+
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      await login(page, 'kubeadmin', process.env.KUBEADMIN_PASSWORD || 'kubeadmin');
+      await page.goto(DETAILS_URL, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-test="broker-app-connection-host"]', { timeout: 30000 });
+
+      // PatternFly ClipboardCopy renders a copy button as the last button in the group.
+      const copyButton = page
+        .locator('[data-test="broker-app-connection-host"]')
+        .getByRole('button');
+      await copyButton.click();
+
+      const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+      expect(clipboardText).toBe(expectedHost);
+      console.log(`✓ Clipboard contains expected host: ${expectedHost}`);
+    });
+
+    // ── Test: provisioned service link in page header navigates to service detail ──
+
+    test('provisioned service link in details header navigates to service detail', async ({
+      page,
+    }) => {
+      await login(page, 'kubeadmin', process.env.KUBEADMIN_PASSWORD || 'kubeadmin');
+      await page.goto(DETAILS_URL, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-test="broker-app-provisioned-service"]', {
+        timeout: 30000,
+      });
+
+      await page.locator('[data-test="broker-app-provisioned-service"] a').click();
+      await expect(page).toHaveURL(new RegExp(SERVICE_NAME), { timeout: 15000 });
+      console.log(`✓ Provisioned service link navigated to ${SERVICE_NAME} detail`);
+    });
+
+    // ── Test: messaging capabilities shows addresses in correct sections ───
+    // Depends on 'multiple producerOf addresses appear in spec' having run first and
+    // created e2e-app-multi-produces with QUEUE.ORDERS/INVOICES/NOTIFICATIONS in producerOf.
+
+    test('messaging capabilities shows producer addresses and empty consumer section', async ({
+      page,
+    }) => {
+      const appName = 'e2e-app-multi-produces';
+      const producerAddresses = ['QUEUE.ORDERS', 'QUEUE.INVOICES', 'QUEUE.NOTIFICATIONS'];
+
+      const appDetailsUrl = `/k8s/ns/${TEST_NAMESPACE}/broker.arkmq.org~v1beta2~BrokerApp/${appName}`;
+      await login(page, 'kubeadmin', process.env.KUBEADMIN_PASSWORD || 'kubeadmin');
+      await page.goto(appDetailsUrl, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-test="broker-app-messaging-capabilities"]', {
+        timeout: 30000,
+      });
+
+      for (const addr of producerAddresses) {
+        await expect(page.locator(`[data-test="producer-address-${addr}"]`)).toBeVisible({
+          timeout: 15000,
+        });
+        console.log(`✓ Producer address "${addr}" visible in Produces To`);
+      }
+
+      await expect(
+        page
+          .locator('[data-test="broker-app-messaging-capabilities"]')
+          .getByText('No addresses configured'),
+      ).toBeVisible({ timeout: 15000 });
+      console.log(`✓ Consumes From shows empty state`);
+
+      // Confirm no producer address leaks into the consumer section.
+      for (const addr of producerAddresses) {
+        await expect(page.locator(`[data-test="consumer-address-${addr}"]`)).not.toBeVisible();
+      }
+      console.log(`✓ No producer address appears in Consumes From`);
     });
   });
 });
