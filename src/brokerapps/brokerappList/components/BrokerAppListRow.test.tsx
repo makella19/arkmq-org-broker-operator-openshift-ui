@@ -102,7 +102,7 @@ describe('BrokerAppListRow', () => {
       makeApp({
         status: {
           conditions: [{ type: 'Deployed', status: K8sResourceConditionStatus.True }],
-          service: { name: 'prod-cluster', namespace: 'test-namespace' },
+          service: { name: 'prod-cluster', namespace: 'test-namespace', assignedPort: 61617 },
         },
       }),
     );

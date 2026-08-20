@@ -87,7 +87,8 @@
       "CreateBrokerServicePage": "./brokerservices/createBrokerService/CreateBrokerServicePage",
       "BrokerServiceListPage": "./brokerservices/brokerServiceList/BrokerServiceListPage",
       "BrokerServiceDetailsPage": "./brokerservices/brokerServiceDetails/BrokerServiceDetailsPage",
-      "BrokerAppListPage": "./brokerapps/brokerappList/BrokerAppListPage"
+      "BrokerAppListPage": "./brokerapps/brokerappList/BrokerAppListPage",
+      "BrokerAppDetailsPage": "./brokerapps/brokerAppDetails/BrokerAppDetailsPage"
     },
     "dependencies": {
       "@console/pluginAPI": ">=4.22.0-0"
